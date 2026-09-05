@@ -1,0 +1,15 @@
+{
+  "name": "aurabr",
+  "description": "aurabr.xyz in your terminal — vote on the aura of Brazilian startups during the pauses you already have.",
+  "owner": {
+    "name": "Guilherme Rodrigues",
+    "email": "gui@deco.cx"
+  },
+  "plugins": [
+    {
+      "name": "aura",
+      "source": "./",
+      "description": "Idle-time duels from aurabr.xyz. When Claude Code goes quiet — waiting on a long subtask, finishing a turn — it shows you two Brazilian startups and asks which has more aura. Research either one before you decide, or let it research both automatically."
+    }
+  ]
+}

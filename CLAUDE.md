@@ -1,0 +1,73 @@
+# aura — working notes
+
+A Claude Code plugin that surfaces aurabr.xyz duels during idle moments.
+Five files do the work; keep it that way.
+
+```
+.claude-plugin/plugin.json       manifest
+.claude-plugin/marketplace.json  single-plugin marketplace, source "./"
+commands/{vote,ranking,config}.md
+hooks/hooks.json                 registers the Stop hook
+hooks/idle.mjs                   the interruption: guards → fetch → additionalContext
+scripts/aura.mjs                 the only implementation. CLI + importable
+docs/api.md                      the reverse-engineered upstream API
+```
+
+## Rules
+
+**`scripts/aura.mjs` is the single source of truth.** The hook imports from it,
+the commands shell out to it. Never reimplement a fetch, a render or the config
+in a command markdown file — add a subcommand instead.
+
+**Zero dependencies, forever.** Node 18+ stdlib only. A plugin that interrupts
+you for a joke does not get to own a `node_modules`.
+
+**The hook must be silent when it declines.** Exit 0 with no stdout. Every
+guard in `idle.mjs` — `enabled`, `stop_hook_active`, `frequency`,
+`cooldownMinutes`, a failed fetch — ends in `quit()`. A hook that prints on the
+way out is a hook the user uninstalls.
+
+**`stop_hook_active` is not optional.** Without it the injected context makes
+Claude respond, which fires `Stop` again, which injects again. Claude Code caps
+the loop, but the cap is not the design.
+
+**Never fake a vote.** `POST /api/vote` is behind Vercel BotID and returns 403
+from any non-browser client. `vote()` queues to `~/.claude/aura-pending.json`
+and reports the refusal verbatim. Do not add silent retries, do not spoof
+`x-is-human`, do not print a success line on a queued vote. The honest failure
+is the feature — it is the case for aurabr shipping an API key.
+
+## The fragile part
+
+`ranking()` parses server-rendered HTML because there is no ranking endpoint.
+Row shapes differ per kind:
+
+| kind | row |
+|---|---|
+| startup | `rank \| name \| "tagline · stage" \| aura \| tier` |
+| college | `rank \| name \| category \| aura \| tier` |
+| vc | `rank \| name \| aura \| tier` |
+
+One regex with an optional middle cell covers all three. When it breaks it
+returns an empty table, which is the right failure — loud, not wrong. Check
+`docs/api.md` before touching it.
+
+## Testing
+
+No framework. Run the CLI against production:
+
+```bash
+node scripts/aura.mjs match --kind vc
+node scripts/aura.mjs ranking --kind college --limit 5
+echo '{"stop_hook_active":false}' | \
+  AURA_CONFIG=/tmp/aura-test.json CLAUDE_PLUGIN_ROOT=$PWD node hooks/idle.mjs
+```
+
+The hook is probabilistic — set `frequency=1` in the test config if it stays
+quiet. `AURA_SITE` overrides the base URL; `AURA_CONFIG` overrides the config
+path so tests never touch the real one.
+
+## Style
+
+Portuguese in anything the user reads at vote time (the site is Brazilian and
+the joke does not survive translation). English in code, comments, and docs.
