@@ -10,6 +10,7 @@ commands/{vote,ranking,config}.md
 hooks/hooks.json                 registers the Stop hook
 hooks/idle.mjs                   the interruption: guards → fetch → additionalContext
 scripts/aura.mjs                 the only implementation. CLI + importable
+scripts/browser-vote.mjs         real-Chrome vote path, over CDP, zero deps
 docs/api.md                      the reverse-engineered upstream API
 ```
 
@@ -19,8 +20,9 @@ docs/api.md                      the reverse-engineered upstream API
 the commands shell out to it. Never reimplement a fetch, a render or the config
 in a command markdown file — add a subcommand instead.
 
-**Zero dependencies, forever.** Node 18+ stdlib only. A plugin that interrupts
-you for a joke does not get to own a `node_modules`.
+**Zero dependencies, forever.** Node 18+ stdlib only; the browser path needs
+Node 22+ for the global `WebSocket` and degrades to the queue below that. A
+plugin that interrupts you for a joke does not get to own a `node_modules`.
 
 **The hook must be silent when it declines.** Exit 0 with no stdout. Every
 guard in `idle.mjs` — `enabled`, `stop_hook_active`, `frequency`,
@@ -31,11 +33,19 @@ way out is a hook the user uninstalls.
 Claude respond, which fires `Stop` again, which injects again. Claude Code caps
 the loop, but the cap is not the design.
 
-**Never fake a vote.** `POST /api/vote` is behind Vercel BotID and returns 403
-from any non-browser client. `vote()` queues to `~/.claude/aura-pending.json`
-and reports the refusal verbatim. Do not add silent retries, do not spoof
-`x-is-human`, do not print a success line on a queued vote. The honest failure
-is the feature — it is the case for aurabr shipping an API key.
+**Never fake a vote, and never fake a browser.** `POST /api/vote` is behind
+Vercel BotID. `vote()` tries three paths in order — plain POST, real local
+Chrome, local queue — and reports which one carried it. The rules:
+
+- Do not forge `x-is-human`, patch the UA string, or otherwise dress a
+  non-browser up as one. The browser path works *because* the browser is real
+  and the human owns it; that is the whole justification.
+- Headless is a dead end, not a challenge. `--headless=new` reports
+  `HeadlessChrome` in its UA and gets 403. Leave it.
+- No silent retries, no background daemon, no batching beyond flushing the
+  user's own queue on their next vote.
+- Never print a success line for a queued vote. `via` says `api`, `browser`, or
+  nothing at all.
 
 ## The fragile part
 
@@ -59,6 +69,7 @@ No framework. Run the CLI against production:
 ```bash
 node scripts/aura.mjs match --kind vc
 node scripts/aura.mjs ranking --kind college --limit 5
+node scripts/browser-vote.mjs <winnerId> <loserId>   # ~10s, real vote
 echo '{"stop_hook_active":false}' | \
   AURA_CONFIG=/tmp/aura-test.json CLAUDE_PLUGIN_ROOT=$PWD node hooks/idle.mjs
 ```

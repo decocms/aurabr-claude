@@ -20,6 +20,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/aura.mjs" config $ARGUMENTS
 | `kind` | `startup` | `startup`, `vc`, or `college` |
 | `autoResearch` | `false` | Always research both before asking |
 | `logos` | `false` | Sketch the logos as ASCII above the cards |
+| `browserVote` | `true` | Cast the vote through a real local Chrome (Node 22+) |
 
 If the user's phrasing is about frequency rather than a key — "too often",
 "leave me alone", "more of these" — translate it yourself: halve or double
