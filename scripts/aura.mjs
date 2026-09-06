@@ -12,8 +12,9 @@ const PENDING_PATH = join(dirname(CONFIG_PATH), "aura-pending.json");
 
 const DEFAULTS = {
   enabled: true,
-  frequency: 0.35,      // chance an idle moment turns into a vote prompt
-  cooldownMinutes: 20,  // never prompt twice inside this window
+  frequency: 0.7,       // chance a qualifying pause turns into a vote prompt
+  cooldownMinutes: 10,  // never prompt twice inside this window
+  alsoWhenDone: false,  // also prompt at plain end-of-turn, not just while you wait
   kind: "startup",      // startup | vc | college
   autoResearch: false,  // always research both before asking
   logos: false,         // let Claude read the logo images and sketch them in ASCII

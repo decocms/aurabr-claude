@@ -15,8 +15,9 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/aura.mjs" config $ARGUMENTS
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `true` | Master switch for the idle interruption |
-| `frequency` | `0.35` | Chance an idle moment becomes a vote prompt |
-| `cooldownMinutes` | `20` | Hard floor between two prompts |
+| `frequency` | `0.7` | Chance a qualifying pause becomes a vote prompt |
+| `cooldownMinutes` | `10` | Hard floor between two prompts |
+| `alsoWhenDone` | `false` | Also prompt at plain end-of-turn, not just while you wait |
 | `kind` | `startup` | `startup`, `vc`, or `college` |
 | `autoResearch` | `false` | Always research both before asking |
 | `logos` | `false` | Sketch the logos as ASCII above the cards |

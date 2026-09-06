@@ -43,16 +43,27 @@ below). No dependencies, no build step, no API key.
 | `/aura:ranking` | The full ranking in your terminal. `--kind`, `--limit` |
 | `/aura:config` | Read or change how often it interrupts you |
 
-## How the interruption works
+## How it picks its moment
 
-A `Stop` hook — the one Claude Code fires right before it concludes a response.
-`hooks/idle.mjs` checks, in order: is the plugin enabled, did it already fire
-this turn, did the dice land under `frequency`, has `cooldownMinutes` elapsed.
-If any check fails it exits silently and costs you nothing. If all pass it
-fetches a duel and injects it as context, and Claude asks before it stops.
+A `Stop` hook. Claude Code fires `Stop` every time the model concludes a turn —
+and crucially, it concludes a turn *while subagents and background shells are
+still running*, because those re-invoke it when they finish. The hook input
+carries `background_tasks`, which tells the two apart:
 
-That means the interruption lands exactly where an interruption is cheap: at
-the end of work, not in the middle of it.
+```
+Stop | [2 subagents running]   ← you are waiting. This is the moment.
+Stop | [1 subagent running]    ← still waiting.
+Stop | []                      ← the work is done. Nobody is waiting on anything.
+```
+
+The plugin fires on the first two and stays quiet on the third. That is the
+whole design: it spends time you were already losing, and it never costs you
+time you were about to use. Prompting at the end of a turn is an interruption;
+prompting while you stare at a spinner is a break. Set `alsoWhenDone=true` if
+you want both.
+
+After that gate it checks `enabled`, `stop_hook_active`, the `frequency` dice
+and `cooldownMinutes`. Any failure exits 0 with no output and costs you nothing.
 
 ## Config
 
@@ -61,8 +72,9 @@ the end of work, not in the middle of it.
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `true` | Master switch |
-| `frequency` | `0.35` | Chance an idle moment becomes a prompt |
-| `cooldownMinutes` | `20` | Hard floor between two prompts |
+| `frequency` | `0.7` | Chance a qualifying pause becomes a prompt |
+| `cooldownMinutes` | `10` | Hard floor between two prompts |
+| `alsoWhenDone` | `false` | Also prompt at plain end-of-turn, not just while you wait |
 | `kind` | `startup` | `startup`, `vc`, or `college` |
 | `autoResearch` | `false` | Always research both before asking |
 | `logos` | `false` | Sketch the logos as ASCII above the cards |
@@ -73,7 +85,7 @@ ASCII art — Claude downloads both logos, looks at them, and sketches them in
 about six lines. It fails silently when it fails, which is often enough that it
 stays off by default.
 
-Too chatty: `/aura:config frequency=0.1`. Done with it: `/aura:config
+Too chatty: `/aura:config frequency=0.2`. Done with it: `/aura:config
 enabled=false`.
 
 ## About your votes

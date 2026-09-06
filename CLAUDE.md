@@ -24,9 +24,16 @@ in a command markdown file — add a subcommand instead.
 Node 22+ for the global `WebSocket` and degrades to the queue below that. A
 plugin that interrupts you for a joke does not get to own a `node_modules`.
 
+**`background_tasks` is the trigger, not `Stop` itself.** `Stop` fires on every
+concluded turn, including the ones concluded while subagents and background
+shells are still running — those re-invoke the model when they finish. The
+non-empty case is the user waiting; the empty case is the user free. Firing on
+the empty case is an interruption, and it is the bug this plugin shipped with in
+0.2.0. Default stays `alsoWhenDone: false`.
+
 **The hook must be silent when it declines.** Exit 0 with no stdout. Every
-guard in `idle.mjs` — `enabled`, `stop_hook_active`, `frequency`,
-`cooldownMinutes`, a failed fetch — ends in `quit()`. A hook that prints on the
+guard in `idle.mjs` — `enabled`, `stop_hook_active`, `background_tasks`,
+`frequency`, `cooldownMinutes`, a failed fetch — ends in `quit()`. A hook that prints on the
 way out is a hook the user uninstalls.
 
 **`stop_hook_active` is not optional.** Without it the injected context makes
@@ -74,8 +81,19 @@ echo '{"stop_hook_active":false}' | \
   AURA_CONFIG=/tmp/aura-test.json CLAUDE_PLUGIN_ROOT=$PWD node hooks/idle.mjs
 ```
 
-The hook is probabilistic — set `frequency=1` in the test config if it stays
-quiet. `AURA_SITE` overrides the base URL; `AURA_CONFIG` overrides the config
+The hook is probabilistic AND gated on in-flight work, so piping it a bare
+`{}` will correctly produce nothing. To exercise the real path, drive a live
+session and watch when it fires:
+
+```bash
+claude -p --settings <settings with the Stop hook> \
+  "Launch two Explore subagents in one message. Do NOT wait for their results
+   — end your turn immediately after launching."
+```
+
+Set `frequency=1`, `cooldownMinutes=0` in a throwaway `AURA_CONFIG` for that
+run. Expect it to fire while `background_tasks` is non-empty and go quiet once
+it drains. `AURA_SITE` overrides the base URL; `AURA_CONFIG` overrides the config
 path so tests never touch the real one.
 
 ## Style
