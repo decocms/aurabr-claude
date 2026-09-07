@@ -41,44 +41,40 @@ between the fetch and the vote.
 
 ## `POST /api/vote`
 
-```json
-{ "winnerId": "…", "loserId": "…" }
+**Closed to API clients as of September 2026.** The plugin no longer attempts it
+beyond one plain POST, and `browserVote` defaults to `false`.
+
+The current client sends a Cloudflare Turnstile token in a header plus a
+server-issued per-match `ticket` in the body:
+
+```js
+async function lO() {
+  const t = await getTurnstileToken();
+  return { "Content-Type": "application/json", ...(t ? { "X-Turnstile-Token": t } : {}) };
+}
+fetch("/api/vote", { method: "POST", headers: await lO(),
+                     body: JSON.stringify({ winnerId, loserId, ticket }) });
 ```
 
-Returns the updated pair plus the Elo swing:
+Anything without both is refused with `403 {"error":"Acesso negado."}`.
 
-```json
-{ "winner": { "…": "…", "aura": 1518 }, "loser": { "…": "…" },
-  "winnerDelta": 15, "loserDelta": -15 }
-```
+### History, and why this repo stops here
 
-The route sits behind Vercel BotID. The site's client bundle wraps
-`window.fetch` and attaches a signed `x-is-human` header (plus `x-path` and
-`x-method`); anything without it is refused:
+The route was previously behind Vercel BotID, which rejected `curl` and
+headless Chrome but accepted a real off-screen Chrome driven over CDP — the
+browser was genuine, so its own bundle signed the request. That was reported to
+the aurabr team privately, together with the observation that BotID was
+filtering *headless*, not *automation*, and that server-side per-session
+validation was the cheap reinforcement.
 
-```
-HTTP/2 403
-server-timing: botid;dur=211
-{"error":"Acesso negado."}
-```
+They shipped it: Turnstile plus per-match tickets, and the aura ladder was
+reset (CloudWalk 3100 → 1539, everything recompressed near 1500).
 
-Measured, September 2026:
-
-| Client | Result |
-|---|---|
-| `curl` / `fetch` from Node | `403` |
-| Chrome `--headless=new` over CDP | `403` — UA reads `HeadlessChrome/152` |
-| Real Chrome window, off-screen, over CDP | `200` |
-
-So `scripts/browser-vote.mjs` launches a genuine Chrome with a throwaway
-profile at `--window-position=-3000,-3000`, waits for `window.fetch` to stop
-being native code (that wrapper *is* the signature), and calls the endpoint
-from inside the page. No header is forged and no fingerprint is faked — the
-browser is real, the human owns it, and the round trip costs about ten seconds
-of cold start.
-
-`--headless=old` and `chrome-headless-shell` are not worth trying; both
-advertise themselves the same way.
+A CAPTCHA the owner deliberately added after being told about the gap is a
+statement, not an obstacle. This repo does not solve it, does not farm it, and
+does not fingerprint around it. If terminal votes should ever count, that is
+aurabr's call to make — an API key with a per-key rate limit would do it, and
+`browserVote` plus the pending queue are already wired for that day.
 
 ## `POST /api/suggestions`
 

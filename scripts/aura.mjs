@@ -18,7 +18,7 @@ const DEFAULTS = {
   kind: "startup",      // startup | vc | college
   autoResearch: false,  // always research both before asking
   logos: false,         // let Claude read the logo images and sketch them in ASCII
-  browserVote: true,    // cast the vote through a real local Chrome (Node 22+)
+  browserVote: false,   // dead since Turnstile shipped; see docs/api.md
 };
 
 const readJSON = (p, fallback) => {
@@ -98,8 +98,10 @@ export const renderMatch = (m) => {
 // Three paths, tried in order:
 //   1. plain POST — free and instant, and the one that works the day aurabr
 //      opens the route to API clients. Today it always 403s (Vercel BotID).
-//   2. a real local Chrome, off-screen, letting the site's own bundle sign the
-//      request. See scripts/browser-vote.mjs.
+//   2. a real local Chrome (scripts/browser-vote.mjs). OFF by default and no
+//      longer viable: aurabr now requires a Cloudflare Turnstile token plus a
+//      server-issued per-match ticket. Kept behind the flag for the day they
+//      offer an API key, not as something to work around.
 //   3. the local queue in ~/.claude/aura-pending.json — a record of intent,
 //      never reported as a vote that landed.
 
@@ -211,7 +213,8 @@ const main = async () => {
         `✦ voto NÃO enviado (${r.status ?? "erro"}: ${r.reason}).\n` +
         (r.browserReason ? `  Chrome local também falhou: ${r.browserReason}\n` : "") +
         `  Enfileirado localmente (${r.queued} pendente(s)) em ${PENDING_PATH}.\n` +
-        `  Vote no site: ${SITE}`,
+        `  /api/vote exige Turnstile + ticket do match — só o site consegue.\n` +
+        `  Vote em ${SITE} — o duelo acima continua no ranking.`,
       );
     }
     return;

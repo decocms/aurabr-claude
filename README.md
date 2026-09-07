@@ -32,8 +32,7 @@ never heard of, taken out of a minute you were losing anyway.
 /plugin install aura@aurabr
 ```
 
-Needs Node 18+, or Node 22+ if you want your votes to actually count (see
-below). No dependencies, no build step, no API key.
+Needs Node 18+. No dependencies, no build step, no API key.
 
 ## Commands
 
@@ -78,7 +77,7 @@ and `cooldownMinutes`. Any failure exits 0 with no output and costs you nothing.
 | `kind` | `startup` | `startup`, `vc`, or `college` |
 | `autoResearch` | `false` | Always research both before asking |
 | `logos` | `false` | Sketch the logos as ASCII above the cards |
-| `browserVote` | `true` | Cast the vote through a real local Chrome |
+| `browserVote` | `false` | Legacy Chrome path — dead since Turnstile, see below |
 
 `autoResearch` turns every duel into a small briefing. `logos` is best-effort
 ASCII art — Claude downloads both logos, looks at them, and sketches them in
@@ -90,32 +89,33 @@ enabled=false`.
 
 ## About your votes
 
-They count. Getting there took a detour.
+**They do not reach the leaderboard.** Everything else does work — the duels,
+the research, all three rankings.
 
-`POST /api/vote` on aurabr.xyz sits behind Vercel BotID, which signs an
-`x-is-human` header from inside the site's own client bundle. A plain `fetch`
-from your terminal has no such header and gets `403 Acesso negado.` Headless
-Chrome gets the same treatment — its user agent says `HeadlessChrome` and BotID
-scores it as a bot.
+`POST /api/vote` now requires a Cloudflare Turnstile token plus a server-issued
+per-match ticket, so only the site itself can cast a vote. The plugin tries one
+plain POST, and on refusal appends to `~/.claude/aura-pending.json` and says so
+plainly. Nothing retries, nothing pretends a vote landed, and the failure takes
+about a tenth of a second.
 
-What does work is an ordinary Chrome window, parked off-screen at
-`-3000,-3000`, driven over the DevTools protocol. The page loads normally, its
-own code wraps `window.fetch`, and the vote is signed the way any vote from
-that browser would be. Nothing is forged: it is your machine, your browser,
-your one vote per prompt. The window is never visible, never steals focus, and
-is killed as soon as the ballot is in.
+It was not always this way, and the history is the honest part. The route used
+to sit behind Vercel BotID, which turned away `curl` and headless Chrome but
+accepted a real off-screen Chrome driven over CDP — a genuine browser signing
+its own request. That got reported to the aurabr team privately, along with the
+point that BotID was filtering *headless* rather than *automation*. They shipped
+the fix: Turnstile, per-match tickets, and a reset ladder.
 
-```
-✦ voto computado (via Chrome local). Trela +15 aura → 1518
-```
+Which is the right outcome, and it is where this repo stops. A CAPTCHA the
+owner added deliberately after being told about the gap is a statement, not an
+obstacle. `scripts/browser-vote.mjs` stays in the tree behind `browserVote`,
+off by default, for the day aurabr decides terminal votes should count — an API
+key with a per-key rate limit is all it would take, and the pending queue is
+already wired for it.
 
-Order of attempts: plain POST first (instant, and the path that works the day
-aurabr opens the route to API clients), then the browser, then — if you have no
-Chrome, or Node older than 22, or `browserVote=false` — the local queue at
-`~/.claude/aura-pending.json`. Queued ballots ride along on the next successful
-browser vote. Nothing ever prints a success line for a vote that did not land.
+Vote at [aurabr.xyz](https://www.aurabr.xyz). The duel the plugin showed you is
+still in the ranking.
 
-`docs/api.md` has the full reverse-engineered API and what each path costs.
+`docs/api.md` has the full reverse-engineered API and the timeline.
 
 ## Credits
 

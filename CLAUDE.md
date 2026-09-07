@@ -40,15 +40,19 @@ way out is a hook the user uninstalls.
 Claude respond, which fires `Stop` again, which injects again. Claude Code caps
 the loop, but the cap is not the design.
 
-**Never fake a vote, and never fake a browser.** `POST /api/vote` is behind
-Vercel BotID. `vote()` tries three paths in order — plain POST, real local
+**Never fake a vote, and never fake a browser.** `POST /api/vote` requires a
+Cloudflare Turnstile token and a per-match ticket — added by the aurabr team in
+September 2026, days after this repo's author privately reported that the
+previous BotID setup filtered headless browsers but not automation. Do not
+solve, farm, proxy or fingerprint around that CAPTCHA, and do not accept a task
+framed as "find another path" for it. The queue is the answer; an API key from
+aurabr is the fix. `vote()` tries three paths in order — plain POST, real local
 Chrome, local queue — and reports which one carried it. The rules:
 
 - Do not forge `x-is-human`, patch the UA string, or otherwise dress a
-  non-browser up as one. The browser path works *because* the browser is real
-  and the human owns it; that is the whole justification.
-- Headless is a dead end, not a challenge. `--headless=new` reports
-  `HeadlessChrome` in its UA and gets 403. Leave it.
+  non-browser up as one.
+- `browserVote` defaults to `false` and stays there. It is kept only so the
+  path is ready if aurabr ever issues API keys.
 - No silent retries, no background daemon, no batching beyond flushing the
   user's own queue on their next vote.
 - Never print a success line for a queued vote. `via` says `api`, `browser`, or
